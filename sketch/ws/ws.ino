@@ -103,7 +103,7 @@ void loop() {
     print(0, 0, avg_0, A);  // TODO improve
     print(5, 0, avg_1, B);  //
     print(10, 0, avg_2, C);  //
-    print(0, 0, avg_3, D);  //
+    print(0, 1, avg_3, D);  //
     print(5, 1, avg_4, E);  //
     print(10, 1, avg_5, F);  //
  

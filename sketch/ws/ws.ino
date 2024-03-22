@@ -21,15 +21,21 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 #define SIZE_AIO 6                  // size AIO Uno
 #define OFFSET_FOR_SOLENOID_PIN 2   // skip RX, TX for bluetooth
-#define SIZE_AVERAGE 10             // to config (count measurements)
+#define COUNT_AVERAGE 10             // to config (count measurements)
 
-int size_measuring = 0;             // depends SIZE_AVERAGE
+int counter_measuring = 0;             // depends COUNT_AVERAGE
 int averages[SIZE_AIO];
 char array[SIZE];                    // for convert to "Bluetooth Electronics"
 
 enum IN { A, B, C, D, E, F };
 
 void setup() {
+  pinMode(A0, INPUT);
+  pinMode(A1, INPUT);
+  pinMode(A2, INPUT);
+  pinMode(A3, INPUT);
+  pinMode(A4, INPUT);
+  pinMode(A5, INPUT);
 
   pinMode(toSolenoidPin(A), OUTPUT);
   pinMode(toSolenoidPin(B), OUTPUT);
@@ -70,7 +76,7 @@ void loop() {
   averages[E] += map(analogRead(A4), DRY, WET, 0, 100);
   averages[F] += map(analogRead(A5), DRY, WET, 0, 100);
 
-  size_measuring++;
+  counter_measuring++;
 
 #ifdef DEBUG
   Serial.print("A0 rawData: ");
@@ -92,13 +98,13 @@ void loop() {
   Serial.println(analogRead(A5));
 #endif
 
-  if (SIZE_AVERAGE == size_measuring) {
-    const int avg_0 = averages[A] / SIZE_AVERAGE;
-    const int avg_1 = averages[B] / SIZE_AVERAGE;
-    const int avg_2 = averages[C] / SIZE_AVERAGE;
-    const int avg_3 = averages[D] / SIZE_AVERAGE;
-    const int avg_4 = averages[E] / SIZE_AVERAGE;
-    const int avg_5 = averages[F] / SIZE_AVERAGE;
+  if (COUNT_AVERAGE == counter_measuring) {
+    const int avg_0 = averages[A] / COUNT_AVERAGE;
+    const int avg_1 = averages[B] / COUNT_AVERAGE;
+    const int avg_2 = averages[C] / COUNT_AVERAGE;
+    const int avg_3 = averages[D] / COUNT_AVERAGE;
+    const int avg_4 = averages[E] / COUNT_AVERAGE;
+    const int avg_5 = averages[F] / COUNT_AVERAGE;
 
     print(0, 0, avg_0, A);  // TODO improve
     print(5, 0, avg_1, B);  //
@@ -122,7 +128,7 @@ void loop() {
     //check(avg_3, toSolenoidPin(F));
 
     resetAvg();
-    size_measuring = 0;
+    counter_measuring = 0;
   }
   delay(1000);
 }

@@ -27,29 +27,23 @@ int counter_measuring = 0;             // depends COUNT_AVERAGE
 int averages[SIZE_AIO];
 char array[SIZE];                    // for convert to "Bluetooth Electronics"
 
-enum IN { A, B, C, D, E, F };
+enum IN { A, B, C, D };
 
 void setup() {
   pinMode(A0, INPUT);
   pinMode(A1, INPUT);
   pinMode(A2, INPUT);
   pinMode(A3, INPUT);
-  pinMode(A4, INPUT);
-  pinMode(A5, INPUT);
 
   pinMode(toSolenoidPin(A), OUTPUT);
   pinMode(toSolenoidPin(B), OUTPUT);
   pinMode(toSolenoidPin(C), OUTPUT);
   pinMode(toSolenoidPin(D), OUTPUT);
-  pinMode(toSolenoidPin(E), OUTPUT);
-  pinMode(toSolenoidPin(F), OUTPUT);
 
   digitalWrite(toSolenoidPin(A), HIGH);
   digitalWrite(toSolenoidPin(B), HIGH);
   digitalWrite(toSolenoidPin(C), HIGH);
   digitalWrite(toSolenoidPin(D), HIGH);
-  digitalWrite(toSolenoidPin(E), HIGH);
-  digitalWrite(toSolenoidPin(F), HIGH);
 
   resetAvg();  // inline
 
@@ -60,8 +54,6 @@ void setup() {
   lcd.print("Watering system");
   lcd.setCursor(0, 1);
   lcd.print(VERSION);
-  delay(2000);
-  lcd.clear();
 #endif
   Serial.begin(SPEED_SERIAL);
 }
@@ -73,8 +65,6 @@ void loop() {
   averages[B] += map(analogRead(A1), DRY, WET, 0, 100);
   averages[C] += map(analogRead(A2), DRY, WET, 0, 100);
   averages[D] += map(analogRead(A3), DRY, WET, 0, 100);
-  averages[E] += map(analogRead(A4), DRY, WET, 0, 100);
-  averages[F] += map(analogRead(A5), DRY, WET, 0, 100);
 
   counter_measuring++;
 
@@ -90,12 +80,6 @@ void loop() {
 
   Serial.print("A3 rawData: ");
   Serial.println(analogRead(A3));
-
-  Serial.print("A4 rawData: ");
-  Serial.println(analogRead(A4));
-
-  Serial.print("A5 rawData: ");
-  Serial.println(analogRead(A5));
 #endif
 
   if (COUNT_AVERAGE == counter_measuring) {
@@ -103,29 +87,21 @@ void loop() {
     const int avg_1 = averages[B] / COUNT_AVERAGE;
     const int avg_2 = averages[C] / COUNT_AVERAGE;
     const int avg_3 = averages[D] / COUNT_AVERAGE;
-    const int avg_4 = averages[E] / COUNT_AVERAGE;
-    const int avg_5 = averages[F] / COUNT_AVERAGE;
 
-    print(0, 0, avg_0, A);  // TODO improve
-    print(5, 0, avg_1, B);  //
-    print(10, 0, avg_2, C);  //
-    print(0, 1, avg_3, D);  //
-    print(5, 1, avg_4, E);  //
-    print(10, 1, avg_5, F);  //
+    print(0, 1, avg_0, A);    // TODO improve
+    print(4, 1, avg_1, B);    //
+    print(8, 1, avg_2, C);    //
+    print(12, 1, avg_3, D);   //
  
     Serial.println(convert(avg_0, A));
     Serial.println(convert(avg_1, B));
     Serial.println(convert(avg_2, C));
     Serial.println(convert(avg_3, D));
-    Serial.println(convert(avg_4, E));
-    Serial.println(convert(avg_5, F));
 
     check(avg_0, toSolenoidPin(A));  // for  testing using now only A and D
     //check(avg_1, toSolenoidPin(B));
     //check(avg_2, toSolenoidPin(C));
     check(avg_3, toSolenoidPin(D));
-    //check(avg_3, toSolenoidPin(E));
-    //check(avg_3, toSolenoidPin(F));
 
     resetAvg();
     counter_measuring = 0;
@@ -142,16 +118,18 @@ inline int toSolenoidPin(IN val) {
 }
 
 void print(const int lcdL, const int lcdC, const int val, const IN pin) {
-  char buff[6];
-  memset(buff, 0, 6);
+  char buff[5];
   buff[0] = convertToChar(pin);
-
-  //if(val < 0) val = 0;
-  //if(val > 100) val = 100;
-
-  buff[strlen(itoa(val, buff + 1, 10)) + 1] = '%';
+  setConstrain(&val);
+  char length = strlen(itoa(val, buff + 1, 10)) + 1;
+  memset(buff + length , 0x20, 5 - length);
   lcd.setCursor(lcdL, lcdC);
   lcd.print(buff);
+}
+
+inline void setConstrain(int * pval){
+  if(*pval < 0) *pval = 0;
+  if(*pval > 100) *pval = 100;
 }
 
 inline char convertToChar(IN pin) {

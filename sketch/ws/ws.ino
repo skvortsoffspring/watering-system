@@ -15,25 +15,69 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #define SPEED_SERIAL 9600
 #define OFFSET_ASCII 65
 
-#define SIZE 4                      // string for "Bluetooth Electronics"
-#define STAR '*'                    // const for "Bluetooth Electronics"
-#define PERIOD_ON_POMPA 5000        // to config (time on pompa)
+#define SIZE 4                // string for "Bluetooth Electronics"
+#define STAR '*'              // const for "Bluetooth Electronics"
+#define PERIOD_ON_POMPA 5000  // to config (time on pompa)
 
-#define SIZE_AIO 4                  // size AIO Uno
-#define OFFSET_FOR_SOLENOID_PIN 2   // skip RX, TX for bluetooth
-char size_average = -1;             // to config (count measurements)
+#define SIZE_AIO 4                 // size AIO Uno
+#define OFFSET_FOR_SOLENOID_PIN 2  // skip RX, TX for bluetooth
+char size_average = -1;            // to config (count measurements)
 
-int counter_measuring = 0;          // depends COUNT_AVERAGE
+int counter_measuring = 0;  // depends COUNT_AVERAGE
 int averages[SIZE_AIO];
-char array[SIZE];                   // for convert to "Bluetooth Electronics"
+char array[SIZE];  // for convert to "Bluetooth Electronics"
 
 enum IN { A,
           B,
           C,
           D };
 
+struct HumiditySettings {
+  bool enable;
+  char min_soil;
+  char max_soil;
+};
+
+struct CommonSettings {
+  short counter_of_size;
+  char max_attempt;
+  HumiditySettings settings[SIZE_AIO];
+};
+
+void init_eeprom(){
+  CommonSettings cs;
+  cs.counter_of_size = 60;
+  cs.max_attempt = 20;
+  cs.settings[0].enable = 1;
+  cs.settings[0].min_soil = 40;
+  cs.settings[0].max_soil = 70;
+
+  cs.settings[1].enable = 1;
+  cs.settings[1].min_soil = 40;
+  cs.settings[1].max_soil = 70;
+
+  cs.settings[2].enable = 1;
+  cs.settings[2].min_soil = 40;
+  cs.settings[2].max_soil = 70;
+
+  cs.settings[3].enable = 1;
+  cs.settings[3].min_soil = 40;
+  cs.settings[3].max_soil = 70;
+
+  EEPROM.put(0, cs);
+}
+
 void setup() {
-  size_average = EEPROM.read(0);
+
+  CommonSettings cs;
+  EEPROM.get(0, cs);
+  Serial.print("counter : ");
+  Serial.println(cs.counter_of_size);
+  
+  Serial.print("[0]: ");
+  Serial.println(cs.settings[0].enable);
+
+  size_average = cs.counter_of_size;
 
   Serial.print("Size averages: ");
   Serial.println((int)size_average);
@@ -48,7 +92,7 @@ void setup() {
   digitalWrite(toSolenoidPin(C), HIGH);
   digitalWrite(toSolenoidPin(D), HIGH);
 
-  resetAvg();                       // inline
+  resetAvg();  // inline
 
 #ifdef DEBUG
   lcd.init();
@@ -90,16 +134,16 @@ void loop() {
     const int avg_2 = averages[C] / size_average;
     const int avg_3 = averages[D] / size_average;
 
-    print(0, 1, avg_0, A);        // TODO improve
-    print(4, 1, avg_1, B);        //
-    print(8, 1, avg_2, C);        //
-    print(12, 1, avg_3, D);       //
+    print(0, 1, avg_0, A);   // TODO improve
+    print(4, 1, avg_1, B);   //
+    print(8, 1, avg_2, C);   //
+    print(12, 1, avg_3, D);  //
     Serial.println(convert(avg_0, A));
     Serial.println(convert(avg_1, B));
     Serial.println(convert(avg_2, C));
     Serial.println(convert(avg_3, D));
 
-    check(avg_0, toSolenoidPin(A));           // for  testing using now only A and D
+    check(avg_0, toSolenoidPin(A));  // for  testing using now only A and D
     //check(avg_1, toSolenoidPin(B));
     //check(avg_2, toSolenoidPin(C));
     check(avg_3, toSolenoidPin(D));
@@ -108,49 +152,50 @@ void loop() {
     counter_measuring = 0;
     delay(1000);
   }
+}
 
-  inline void resetAvg() {
-    memset(averages, 0, sizeof(int) * SIZE_AIO);
-  }
+inline void resetAvg() {
+  memset(averages, 0, sizeof(int) * SIZE_AIO);
+}
 
-  inline int toSolenoidPin(IN val) {
-    return val + OFFSET_FOR_SOLENOID_PIN;
-  }
+inline int toSolenoidPin(IN val) {
+  return val + OFFSET_FOR_SOLENOID_PIN;
+}
 
-  void print(const int lcdL, const int lcdC, const int val, const IN pin) {
-    char buff[5];
-    buff[0] = convertToChar(pin);
-    setConstrain(&val);
-    char length = strlen(itoa(val, buff + 1, 10)) + 1;
-    memset(buff + length, 0x20, 5 - length);
-    lcd.setCursor(lcdL, lcdC);
-    lcd.print(buff);
-  }
+void print(const int lcdL, const int lcdC, const int val, const IN pin) {
+  char buff[5];
+  buff[0] = convertToChar(pin);
+  setConstrain(&val);
+  char length = strlen(itoa(val, buff + 1, 10)) + 1;
+  memset(buff + length, 0x20, 5 - length);
+  lcd.setCursor(lcdL, lcdC);
+  lcd.print(buff);
+}
 
-  inline void setConstrain(int *pval) {
-    if (*pval < 0)
-      *pval = 0;
-    if (*pval > 99)
-      *pval = 99;
-  }
+inline void setConstrain(int *pval) {
+  if (*pval < 0)
+    *pval = 0;
+  if (*pval > 99)
+    *pval = 99;
+}
 
-  inline char convertToChar(IN pin) {
-    return pin + OFFSET_ASCII;
-  }
+inline char convertToChar(IN pin) {
+  return pin + OFFSET_ASCII;
+}
 
-  char *convert(int val, char pin) {
-    memset(array, 0, SIZE);
-    array[0] = STAR;
-    array[1] = convertToChar(pin);
-    const int length = strlen(itoa(val, array + 2, 10));
-    array[length + 2] = STAR;
-    return array;
-  }
+char *convert(int val, char pin) {
+  memset(array, 0, SIZE);
+  array[0] = STAR;
+  array[1] = convertToChar(pin);
+  const int length = strlen(itoa(val, array + 2, 10));
+  array[length + 2] = STAR;
+  return array;
+}
 
-  void check(int val, int out) {
-    if (val < 40) {
-      digitalWrite(out, LOW);
-      delay(PERIOD_ON_POMPA);
-      digitalWrite(out, HIGH);
-    }
+void check(int val, int out) {
+  if (val < 40) {
+    digitalWrite(out, LOW);
+    delay(PERIOD_ON_POMPA);
+    digitalWrite(out, HIGH);
   }
+}

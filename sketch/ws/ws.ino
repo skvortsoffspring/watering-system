@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include <EEPROM.h>
 
 #define VERSION "Version: 0.0.2"
 
@@ -14,26 +15,24 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #define SPEED_SERIAL 9600
 #define OFFSET_ASCII 65
 
+#define SIZE 4                          // string for "Bluetooth Electronics"
+#define STAR '*'                        // const for "Bluetooth Electronics"
+#define PERIOD_ON_POMPA 5000            // to config (time on pompa)
 
-#define SIZE 6                      // string for "Bluetooth Electronics"
-#define STAR '*'                    // const for "Bluetooth Electronics"
-#define PERIOD_ON_POMPA 5000        // to config (time on pompa)
+#define SIZE_AIO 4                      // size AIO Uno
+#define OFFSET_FOR_SOLENOID_PIN 2       // skip RX, TX for bluetooth
+char size_average = -1;                 // to config (count measurements)
 
-#define SIZE_AIO 6                  // size AIO Uno
-#define OFFSET_FOR_SOLENOID_PIN 2   // skip RX, TX for bluetooth
-#define COUNT_AVERAGE 10             // to config (count measurements)
-
-int counter_measuring = 0;             // depends COUNT_AVERAGE
+int counter_measuring = 0;              // depends COUNT_AVERAGE
 int averages[SIZE_AIO];
-char array[SIZE];                    // for convert to "Bluetooth Electronics"
+char array[SIZE];                       // for convert to "Bluetooth Electronics"
 
 enum IN { A, B, C, D };
 
 void setup() {
-  pinMode(A0, INPUT);
-  pinMode(A1, INPUT);
-  pinMode(A2, INPUT);
-  pinMode(A3, INPUT);
+  size_average = EEPROM.read(0);
+   Serial.print("Size averages: ");
+  Serial.println((int)size_average);
 
   pinMode(toSolenoidPin(A), OUTPUT);
   pinMode(toSolenoidPin(B), OUTPUT);
@@ -58,8 +57,8 @@ void setup() {
   Serial.begin(SPEED_SERIAL);
 }
 
-
 void loop() {
+  char _switch = 0;
 
   averages[A] += map(analogRead(A0), DRY, WET, 0, 100);
   averages[B] += map(analogRead(A1), DRY, WET, 0, 100);
@@ -82,11 +81,11 @@ void loop() {
   Serial.println(analogRead(A3));
 #endif
 
-  if (COUNT_AVERAGE == counter_measuring) {
-    const int avg_0 = averages[A] / COUNT_AVERAGE;
-    const int avg_1 = averages[B] / COUNT_AVERAGE;
-    const int avg_2 = averages[C] / COUNT_AVERAGE;
-    const int avg_3 = averages[D] / COUNT_AVERAGE;
+  if (size_average == counter_measuring) {
+    const int avg_0 = averages[A] / size_average;
+    const int avg_1 = averages[B] / size_average;
+    const int avg_2 = averages[C] / size_average;
+    const int avg_3 = averages[D] / size_average;
 
     print(0, 1, avg_0, A);    // TODO improve
     print(4, 1, avg_1, B);    //
@@ -105,6 +104,19 @@ void loop() {
 
     resetAvg();
     counter_measuring = 0;
+
+    _switch = _switch ? 1 : 0;
+    if(_switch){
+      Serial.println("A");
+      Serial.println("B");
+      Serial.println("C");
+      Serial.println("D");
+    }else{
+      Serial.println("a");
+      Serial.println("b");
+      Serial.println("c");
+      Serial.println("d");
+    }
   }
   delay(1000);
 }
@@ -129,7 +141,7 @@ void print(const int lcdL, const int lcdC, const int val, const IN pin) {
 
 inline void setConstrain(int * pval){
   if(*pval < 0) *pval = 0;
-  if(*pval > 100) *pval = 100;
+  if(*pval > 99) *pval = 99;
 }
 
 inline char convertToChar(IN pin) {

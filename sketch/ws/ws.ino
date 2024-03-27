@@ -188,15 +188,14 @@ inline IN convertToEnum(char ch) {
 
 #ifdef LCD
 void print(const int val, const IN in, bool isEnable) {
-  char length = 3;
-  char buff[] = { '-', '-', '-', '-', '-' };
-  buff[0] = convertToChar(in);
+  char length = 2;
+  char buff[] = { convertToChar(in), '-', '-', 0x20, 0 };
+
   if (isEnable) {
     setConstrain(&val);
     length = strlen(itoa(val, buff + 1, 10)) + 1;
+    memset(buff + length, 0x20, strlen(buff) + 1 - length);
   }
-  memset(buff + length, 0x20, strlen(buff) - length);
-
   lcd.setCursor(in * 4, 1);
   lcd.print(buff);
 }

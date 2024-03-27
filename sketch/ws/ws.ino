@@ -13,7 +13,7 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #endif
 
 #define DRY 460
-#define WET 190
+#define WET 185
 
 #define SPEED_SERIAL 9600
 #define OFFSET_ASCII 65
@@ -187,13 +187,13 @@ inline IN convertToEnum(char ch) {
 }
 
 #ifdef LCD
-void print(const int val, const IN in, bool isEnable) {
+void print(const int value, const IN in, bool isEnable) {
   char length = 2;
   char buff[] = { convertToChar(in), '-', '-', 0x20, 0 };
 
   if (isEnable) {
-    setConstrain(&val);
-    length = strlen(itoa(val, buff + 1, 10)) + 1;
+    setConstrain(&value);
+    length = strlen(itoa(value, buff + 1, 10)) + 1;
     memset(buff + length, 0x20, strlen(buff) + 1 - length);
   }
   lcd.setCursor(in * 4, 1);
@@ -212,6 +212,7 @@ void formatAndSend(const IN pin, const int value) {
   char buff[] = { 0, 0, 0, 0, 0, 0 };  // for convert to "Bluetooth Electronics"
   buff[0] = STAR;
   buff[1] = convertToChar(pin);
+  setConstrain(&value);
   buff[strlen(itoa(value, buff + 2, 10)) + 2] = STAR;
   Serial.println(buff);
 }

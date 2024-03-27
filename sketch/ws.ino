@@ -16,14 +16,14 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #define SPEED_SERIAL 9600
 #define OFFSET_ASCII 65
 
-#define STAR '*'              // const for "Bluetooth Electronics"
-#define PERIOD_ON_POMP 5000  // to config (time on pompa)
+#define STAR '*'                    // const for "Bluetooth Electronics"
+#define PERIOD_ON_POMP 5000         // to config (time on pompa)
 
-#define SIZE_AIO 4                 // size AIO Uno
-#define OFFSET_FOR_SOLENOID_PIN 2  // skip RX, TX for bluetooth
-char size_average = -1;            // to config (count measurements)
+#define SIZE_AIO 4                  // size AIO Uno
+#define OFFSET_FOR_SOLENOID_PIN 2   // skip RX, TX for bluetooth
+char size_average = 0;              // to config (count measurements)
 
-int counter_measuring = 0;  // depends COUNT_AVERAGE
+int counter_measuring = 0;          // depends COUNT_AVERAGE
 int averages[SIZE_AIO];
 char templateOn[] = "*_R255G255B0*";
 char templateOff[] = "*_R0G0B0*";
@@ -128,7 +128,7 @@ void loop() {
 
   if (millis() - prevMillis >= 1000) {
 
-    for (int i = 0; i < 4; i++) {
+    for (IN in = A; in <= D; in++) {
       if (cs.settings[i].enable) {
         templateOn[1] = convertToChar((IN)i) + 4;
         Serial.println(templateOn);
@@ -137,6 +137,12 @@ void loop() {
         Serial.println(templateOff);
       }
     }
+    Serial.println("----");
+    Serial.println(A0);
+    Serial.println(A1);
+    Serial.println(A2);
+    Serial.println(A3);
+    Serial.println("----");
 
     averages[A] += map(analogRead(A0), DRY, WET, 0, 100);
     averages[B] += map(analogRead(A1), DRY, WET, 0, 100);

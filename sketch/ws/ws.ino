@@ -51,14 +51,10 @@ CommonSettings cs;
 unsigned long prevMillis = millis();
 
 void init_eeprom() {
-  const short DEFAULT_COUNTER_SIZE = 60;
-  const char DEFAULT_MAX_ATTEMPT = 20;
-
-  cs.counter_of_size = DEFAULT_COUNTER_SIZE;
-  cs.max_attempt = DEFAULT_COUNTER_SIZE;
-
-  for (IN in = IN::A; in <= IN::D; in = in + 1) {
-    cs.settings[in].enable = true;
+  cs.counter_of_size = 60;
+  cs.max_attempt = 20;
+  for (IN in = A; in <= D; in = in + 1) {
+    cs.settings[in].enable = 1;
     cs.settings[in].min_soil = 40;
     cs.settings[in].max_soil = 70;
   }
@@ -223,7 +219,7 @@ void check(int val, IN in) {
   Serial.print(convertToChar(in));
   Serial.println(val);
 #endif
-  if (val < 40) {
+  if (val < cs.settings[in].min_soil) {
     digitalWrite(pin, LOW);
     delay(PERIOD_ON_POMP);
     digitalWrite(pin, HIGH);

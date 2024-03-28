@@ -73,15 +73,10 @@ void setup() {
   Serial.print("Size averages: ");
   Serial.println((int)cs.counter_of_size);
 
-  pinMode(toSolenoidPin(A), OUTPUT);
-  pinMode(toSolenoidPin(B), OUTPUT);
-  pinMode(toSolenoidPin(C), OUTPUT);
-  pinMode(toSolenoidPin(D), OUTPUT);
-
-  digitalWrite(toSolenoidPin(A), HIGH);
-  digitalWrite(toSolenoidPin(B), HIGH);
-  digitalWrite(toSolenoidPin(C), HIGH);
-  digitalWrite(toSolenoidPin(D), HIGH);
+  for (IN i = A; i <= D; i = i + 1) {
+    pinMode(toSolenoidPin(i), OUTPUT);
+    digitalWrite(toSolenoidPin(i), HIGH);
+  }
 
   resetAvg();
 

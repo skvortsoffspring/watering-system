@@ -19,12 +19,15 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #define SPEED_SERIAL 9600
 #define OFFSET_ASCII 65
 
-#define STAR '*'             // const for "Bluetooth Electronics"
-#define PERIOD_ON_POMP 5000  // to config (time on pompa)
+#define STAR '*'  // const for "Bluetooth Electronics"
 
 #define SIZE_AIO 4                 // size AIO Uno
 #define OFFSET_FOR_SOLENOID_PIN 2  // skip RX, TX for bluetooth
-char size_average = 0;             // to config (count measurements)
+
+#define MIN_VALUE 0
+#define MAX_VALUE 100
+
+char size_average = 0;  // to config (count measurements)
 
 int counter_measuring = 0;  // depends COUNT_AVERAGE
 int averages[SIZE_AIO];
@@ -38,13 +41,14 @@ enum IN { A,
 
 struct HumiditySettings {
   bool enable;
-  char min_soil;
-  char max_soil;
+  unsigned char minSoil;
+  unsigned char maxSoil;
 };
 
 struct CommonSettings {
-  short counter_of_size;
-  char max_attempt;
+  unsigned short counterOfSize;
+  unsigned short timeOnPomp;
+  unsigned char maxAttempt;
   HumiditySettings settings[SIZE_AIO];
 };
 
@@ -52,12 +56,13 @@ CommonSettings cs;
 unsigned long prevMillis = millis();
 
 void init_eeprom() {
-  cs.counter_of_size = 60;
-  cs.max_attempt = 20;
+  cs.counterOfSize = 60;
+  cs.timeOnPomp = 5000;
+  cs.maxAttempt = 20;
   for (IN in = A; in <= D; in = in + 1) {
     cs.settings[in].enable = 1;
-    cs.settings[in].min_soil = 40;
-    cs.settings[in].max_soil = 70;
+    cs.settings[in].minSoil = 40;
+    cs.settings[in].maxSoil = 70;
   }
   EEPROM.put(START_ADDRESS, cs);
 }
@@ -72,7 +77,7 @@ void setup() {
   EEPROM.get(START_ADDRESS, cs);
 
   Serial.print("Size averages: ");
-  Serial.println((int)cs.counter_of_size);
+  Serial.println((int)cs.counterOfSize);
 
   for (IN i = A; i <= D; i = i + 1) {
     pinMode(toSolenoidPin(i), OUTPUT);
@@ -105,10 +110,10 @@ void loop() {
       IN in = convertToEnum(string[0]);
       if (A == in || B == in || C == in || D == in) {
         if (string[1] == '1') {
-          cs.settings[in].enable = 1;
+          cs.settings[in].enable = true;
           averages[in] = 0;
         } else {
-          cs.settings[in].enable = 0;
+          cs.settings[in].enable = false;
         }
         EEPROM.put(START_ADDRESS, cs);
         EEPROM.get(START_ADDRESS, cs);
@@ -144,11 +149,8 @@ void loop() {
       prevMillis = millis();
     }
 
-    if (counter_measuring == cs.counter_of_size) {
+    if (counter_measuring == cs.counterOfSize) {
       for (IN i = A; i <= D; i = i + 1) {
-        Serial.println(counter_measuring);
-        Serial.println(averages[i]);
-        Serial.println(i);
         if (cs.settings[i].enable) check(averages[i] / counter_measuring, i);
       }
       resetAvg();
@@ -193,18 +195,19 @@ void print(const int value, const IN in, bool isEnable) {
 #endif
 
 inline void setConstrain(int *pval) {
-  if (*pval < 0)
-    *pval = 0;
-  if (*pval > 100)
-    *pval = 100;
+  if (*pval < MIN_VALUE)
+    *pval = MIN_VALUE;
+  if (*pval > MAX_VALUE)
+    *pval = MAX_VALUE;
 }
 
 void formatAndSend(const IN pin, const int value) {
-  char buff[] = { 0, 0, 0, 0, 0, 0 };  // for convert to "Bluetooth Electronics"
+  const char offset = 2;
+  char buff[] = { 0, 0, 0, 0, 0, 0 };
   buff[0] = STAR;
   buff[1] = convertToChar(pin);
   setConstrain(&value);
-  buff[strlen(itoa(value, buff + 2, 10)) + 2] = STAR;
+  buff[strlen(itoa(value, buff + offset, 10)) + offset] = STAR;
   Serial.println(buff);
 }
 
@@ -215,9 +218,9 @@ void check(int val, IN in) {
   Serial.print(convertToChar(in));
   Serial.println(val);
 #endif
-  if (val < cs.settings[in].min_soil) {
+  if (val < cs.settings[in].minSoil) {
     digitalWrite(pin, LOW);
-    delay(PERIOD_ON_POMP);
+    delay(cs.timeOnPomp);
     digitalWrite(pin, HIGH);
   }
 }

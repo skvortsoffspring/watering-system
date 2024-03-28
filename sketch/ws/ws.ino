@@ -3,7 +3,7 @@
 #include <LiquidCrystal_I2C.h>
 
 #define VERSION "Version: 0.0.3"
-#define START_ADDRES 0
+#define START_ADDRESS 0
 
 //#define DEBUG
 #define LCD
@@ -59,7 +59,7 @@ void init_eeprom() {
     cs.settings[in].min_soil = 40;
     cs.settings[in].max_soil = 70;
   }
-  EEPROM.put(START_ADDRES, cs);
+  EEPROM.put(START_ADDRESS, cs);
 }
 
 void setup() {
@@ -69,7 +69,7 @@ void setup() {
 #endif
 
   Serial.begin(SPEED_SERIAL);
-  EEPROM.get(START_ADDRES, cs);
+  EEPROM.get(START_ADDRESS, cs);
 
   Serial.print("Size averages: ");
   Serial.println((int)cs.counter_of_size);
@@ -110,8 +110,8 @@ void loop() {
         } else {
           cs.settings[in].enable = 0;
         }
-        EEPROM.put(START_ADDRES, cs);
-        EEPROM.get(START_ADDRES, cs);
+        EEPROM.put(START_ADDRESS, cs);
+        EEPROM.get(START_ADDRESS, cs);
       }
     }
   }

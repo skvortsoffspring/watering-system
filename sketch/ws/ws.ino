@@ -2,7 +2,7 @@
 #include <EEPROM.h>
 #include <LiquidCrystal_I2C.h>
 
-#define VERSION "Version: 0.0.2"
+#define VERSION "Version: 0.0.3"
 
 //#define DEBUG
 #define LCD
@@ -51,10 +51,14 @@ CommonSettings cs;
 unsigned long prevMillis = millis();
 
 void init_eeprom() {
-  cs.counter_of_size = 60;
-  cs.max_attempt = 20;
-  for (IN in = A; in <= D; in = in + 1) {
-    cs.settings[in].enable = 1;
+  const short DEFAULT_COUNTER_SIZE = 60;
+  const char DEFAULT_MAX_ATTEMPT = 20;
+
+  cs.counter_of_size = DEFAULT_COUNTER_SIZE;
+  cs.max_attempt = DEFAULT_COUNTER_SIZE;
+
+  for (IN in = IN::A; in <= IN::D; in = in + 1) {
+    cs.settings[in].enable = true;
     cs.settings[in].min_soil = 40;
     cs.settings[in].max_soil = 70;
   }
@@ -122,6 +126,8 @@ void loop() {
 
   if (millis() - prevMillis >= 1000) {
 
+    counter_measuring++;
+
     for (IN in = A; in <= D; in = in + 1) {
 
       bool isEnable = cs.settings[in].enable;
@@ -131,38 +137,31 @@ void loop() {
         templateOn[1] = convertToChar(in) + 4;
         Serial.println(templateOn);
         averages[in] += value = map(analogRead(toAioPin(in)), DRY, WET, 0, 100);
+        Serial.println(averages[in]);
       } else {
         templateOff[1] = convertToChar(in) + 4;
         Serial.println(templateOff);
       }
 
-      counter_measuring++;
-
       formatAndSend(in, value);
-
-#ifdef DEBUG
-      Serial.print(convertToChar(in));
-      Serial.println(analogRead(toAioPin(in)));
-#endif
 
 #ifdef LCD
       print(value, in, isEnable);
 #endif
 
-      if (counter_measuring >= cs.counter_of_size) {
-        const int avg = averages[in] / counter_measuring;
-
-        if (isEnable)
-          check(avg, toSolenoidPin(in));
-
-        if (D == in) {
-          resetAvg();
-          counter_measuring = 0;
-        }
-      }
+      prevMillis = millis();
     }
 
-    prevMillis = millis();
+    if (counter_measuring == cs.counter_of_size) {
+      for (IN i = A; i <= D; i = i + 1) {
+        Serial.println(counter_measuring);
+        Serial.println(averages[i]);
+        Serial.println(i);
+        if (cs.settings[i].enable) check(averages[i] / counter_measuring, i);
+      }
+      resetAvg();
+      counter_measuring = 0;
+    }
   }
 }
 
@@ -217,10 +216,16 @@ void formatAndSend(const IN pin, const int value) {
   Serial.println(buff);
 }
 
-void check(int val, int out) {
+void check(int val, IN in) {
+  const int pin = toSolenoidPin(in);
+#ifdef DEBUG
+  Serial.print("check: ");
+  Serial.print(convertToChar(in));
+  Serial.println(val);
+#endif
   if (val < 40) {
-    digitalWrite(out, LOW);
+    digitalWrite(pin, LOW);
     delay(PERIOD_ON_POMP);
-    digitalWrite(out, HIGH);
+    digitalWrite(pin, HIGH);
   }
 }

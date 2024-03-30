@@ -4,7 +4,7 @@
 #include <limits.h>
 
 #define VERSION "Version: 0.0.3"
-#define START_ADDRESS 128
+#define START_ADDRESS 0
 
 //#define DEBUG
 #define LCD
@@ -32,7 +32,6 @@ char size_average = 0;  // to config (count measurements)
 
 char templateOn[] = "*_R255G255B0*";
 char templateOff[] = "*_R0G0B0*";
-unsigned char max = UCHAR_MAX;
 
 namespace IN {
 enum IN { A,

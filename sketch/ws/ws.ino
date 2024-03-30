@@ -1,13 +1,14 @@
 #include <Wire.h>
 #include <EEPROM.h>
 #include <LiquidCrystal_I2C.h>
+#include <limits.h>
 
 #define VERSION "Version: 0.0.3"
-#define START_ADDRESS 0
+#define START_ADDRESS 128
 
 //#define DEBUG
 #define LCD
-//#define INIT
+#define INIT
 
 #ifdef LCD
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -29,25 +30,34 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 char size_average = 0;  // to config (count measurements)
 
-int counter_measuring = 0;  // depends COUNT_AVERAGE
-int averages[SIZE_AIO];
 char templateOn[] = "*_R255G255B0*";
 char templateOff[] = "*_R0G0B0*";
+unsigned char max = UCHAR_MAX;
 
+namespace IN {
 enum IN { A,
           B,
           C,
           D };
+}
+
+namespace RGB {
+enum RGB : char { R = 'R',
+                  G = 'G',
+                  B = 'B' };
+}
 
 struct HumiditySettings {
+  unsigned int counter;
+  unsigned int accum;
   bool enable;
   unsigned char minSoil;
   unsigned char maxSoil;
 };
 
 struct CommonSettings {
-  unsigned short counterOfSize;
-  unsigned short timeOnPomp;
+  unsigned char counterSize;
+  unsigned char timeOnPomp;
   unsigned char maxAttempt;
   HumiditySettings settings[SIZE_AIO];
 };
@@ -56,13 +66,15 @@ CommonSettings cs;
 unsigned long prevMillis = millis();
 
 void init_eeprom() {
-  cs.counterOfSize = 60;
-  cs.timeOnPomp = 5000;
+  cs.counterSize = 60;
+  cs.timeOnPomp = 5;
   cs.maxAttempt = 20;
-  for (IN in = A; in <= D; in = in + 1) {
+  for (IN::IN in = IN::A; in <= IN::D; in = in + 1) {
     cs.settings[in].enable = 1;
+    cs.settings[in].counter = 0;
     cs.settings[in].minSoil = 40;
     cs.settings[in].maxSoil = 70;
+    cs.settings[in].accum = 0;
   }
   EEPROM.put(START_ADDRESS, cs);
 }
@@ -76,15 +88,11 @@ void setup() {
   Serial.begin(SPEED_SERIAL);
   EEPROM.get(START_ADDRESS, cs);
 
-  Serial.print("Size averages: ");
-  Serial.println((int)cs.counterOfSize);
-
-  for (IN i = A; i <= D; i = i + 1) {
+  for (IN::IN i = IN::A; i <= IN::D; i = i + 1) {
     pinMode(toSolenoidPin(i), OUTPUT);
     digitalWrite(toSolenoidPin(i), HIGH);
   }
 
-  resetAvg();
 
 #ifdef LCD
   lcd.init();
@@ -101,19 +109,21 @@ void loop() {
   char string[8] = { 0 };
 
   if (availableBytes == 2) {
+    Serial.flush();
     memset(string, 0, 8);
     for (int i = 0; i < availableBytes; i++) {
       string[i] = Serial.read();
     }
 
     if (2 == availableBytes) {
-      IN in = convertToEnum(string[0]);
-      if (A == in || B == in || C == in || D == in) {
+      IN::IN in = convertToInEnum(string[0]);
+      if (IN::A == in || IN::B == in || IN::C == in || IN::D == in) {
         if (string[1] == '1') {
           cs.settings[in].enable = true;
-          averages[in] = 0;
+          cs.settings[in].accum = 0;
         } else {
           cs.settings[in].enable = false;
+          cs.settings[in].accum = 0;
         }
         EEPROM.put(START_ADDRESS, cs);
         EEPROM.get(START_ADDRESS, cs);
@@ -123,18 +133,15 @@ void loop() {
 
   if (millis() - prevMillis >= 1000) {
 
-    counter_measuring++;
-
-    for (IN in = A; in <= D; in = in + 1) {
-
-      bool isEnable = cs.settings[in].enable;
+    for (IN::IN in = IN::A; in <= IN::D; in = in + 1) {
       int value = 0;
-
-      if (isEnable) {
+      if (cs.settings[in].enable) {
+        cs.settings[in].counter++;
+        value = map(analogRead(toAioPin(in)), DRY, WET, 0, 100);
+        setConstrain(&value);
+        cs.settings[in].accum += value;
         templateOn[1] = convertToChar(in) + 4;
         Serial.println(templateOn);
-        averages[in] += value = map(analogRead(toAioPin(in)), DRY, WET, 0, 100);
-        Serial.println(averages[in]);
       } else {
         templateOff[1] = convertToChar(in) + 4;
         Serial.println(templateOff);
@@ -143,49 +150,46 @@ void loop() {
       formatAndSend(in, value);
 
 #ifdef LCD
-      print(value, in, isEnable);
+      print(value, in, cs.settings[in].enable);
 #endif
 
       prevMillis = millis();
-    }
 
-    if (counter_measuring == cs.counterOfSize) {
-      for (IN i = A; i <= D; i = i + 1) {
-        if (cs.settings[i].enable) check(averages[i] / counter_measuring, i);
+      if (cs.settings[in].enable && cs.counterSize == cs.settings[in].counter) {
+        check(cs.settings[in].accum / cs.settings[in].counter, in);
+        resetMeasuring(in);
       }
-      resetAvg();
-      counter_measuring = 0;
     }
   }
 }
 
-inline void resetAvg() {
-  memset(averages, 0, sizeof(int) * SIZE_AIO);
+void resetMeasuring(IN::IN in) {
+  cs.settings[in].accum = 0;
+  cs.settings[in].counter = 0;
 }
 
-inline int toSolenoidPin(IN val) {
+inline int toSolenoidPin(IN::IN val) {
   return val + OFFSET_FOR_SOLENOID_PIN;
 }
 
-inline int toAioPin(IN val) {
+inline int toAioPin(IN::IN val) {
   return val + 14;
 }
 
-inline char convertToChar(IN pin) {
+inline char convertToChar(IN::IN pin) {
   return pin + OFFSET_ASCII;
 }
 
-inline IN convertToEnum(char ch) {
+inline IN::IN convertToInEnum(char ch) {
   return ch - OFFSET_ASCII;
 }
 
 #ifdef LCD
-void print(const int value, const IN in, bool isEnable) {
+void print(const int value, const IN::IN in, bool isEnable) {
   char length = 2;
   char buff[] = { convertToChar(in), '-', '-', 0x20, 0 };
 
   if (isEnable) {
-    setConstrain(&value);
     length = strlen(itoa(value, buff + 1, 10)) + 1;
     memset(buff + length, 0x20, strlen(buff) + 1 - length);
   }
@@ -201,17 +205,21 @@ inline void setConstrain(int *pval) {
     *pval = MAX_VALUE;
 }
 
-void formatAndSend(const IN pin, const int value) {
+void formatAndSend(const IN::IN pin, const int value) {
+  const char size = 6;
   const char offset = 2;
-  char buff[] = { 0, 0, 0, 0, 0, 0 };
-  buff[0] = STAR;
-  buff[1] = convertToChar(pin);
+  char out[] = { 0, 0, 0, 0, 0, 0 };
+  char buff[3];  // 0-100
+  out[0] = STAR;
+  out[1] = convertToChar(pin);
   setConstrain(&value);
-  buff[strlen(itoa(value, buff + offset, 10)) + offset] = STAR;
-  Serial.println(buff);
+  itoa(value, buff, 10);
+  strcat(out, buff);
+  out[strlen(out)] = STAR;
+  Serial.println(out);
 }
 
-void check(int val, IN in) {
+void check(int val, IN::IN in) {
   const int pin = toSolenoidPin(in);
 #ifdef DEBUG
   Serial.print("check: ");
@@ -220,7 +228,7 @@ void check(int val, IN in) {
 #endif
   if (val < cs.settings[in].minSoil) {
     digitalWrite(pin, LOW);
-    delay(cs.timeOnPomp);
+    delay(cs.timeOnPomp * 1000);
     digitalWrite(pin, HIGH);
   }
 }
